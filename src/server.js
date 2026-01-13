@@ -27,29 +27,33 @@ São número que expressão informações ao frontend.
 
 */
 import http from 'node:http'
+import { middelewares } from './middlewares/json.js';
+import { routes } from './routes.js';
+import { extractQueryParams } from './Utils/extractQueryParams.js';
 
-const users = [];
 
-const server = http.createServer((request, response)=>{
+const server = http.createServer(async(request, response)=>{
     const {method, url} = request;
-    //Identificando rotas e respostas por metodo utilizado
-    if(method === "GET" && url === "/users"){
-        //Não podemos devolver arrays, temos que conveter para JSON
-       return response
-       .setHeader("Content-type","application/json")//Cabeçalho enviado para o front saber que se trata de Json
-       .end(JSON.stringify(users));
-    }
-    if(method === "POST" && url === "/users"){
-        users.push({
-            "id":1,
-            "name": "pedro",
-            "email":"pedro@gmail"
-        });
+    
+    //Envio do request e response aos middelewares
+    await middelewares(request, response);
 
 
-        return response
-        .writeHead(201)
-        .end();
+    //Vai ver se a requisiçao que sera feita pelo server bate com alguma rota criada em routes
+    const route = routes.find(route =>{
+        return route.method === method && route.path.test(url);
+    })
+
+    //Se achar uma rota passa os dados 
+    if(route){
+        const routeParams = request.url.match(route.path);
+
+        const {query, ...params} = routeParams.groups
+
+        request.params = params;
+        request.query = query ? extractQueryParams(query) : {};
+
+        return route.handler(request, response);
     }
 
     return response
@@ -57,5 +61,5 @@ const server = http.createServer((request, response)=>{
     .end("Rota não encontrada");
 });
 
-//Definindo porta que ira utilizar 
+//Definindo porta que o servidor ira utilizar 
 server.listen(3333);
